@@ -1,0 +1,230 @@
+/* code released 18 july 2018 
+Code Author HASIB/Haxord7 
+fb.me/hax43 */
+
+
+#include <TinyGPS++.h>
+#include <SoftwareSerial.h>
+#include <ESP8266WiFi.h>
+#include <WiFiClient.h>
+#include <ESP8266WebServer.h>
+
+
+TinyGPSPlus gps;  // The TinyGPS++ object
+
+SoftwareSerial ss(4, 5); // The serial connection to the GPS device
+
+
+/*------------------------------------------------------------------------*/
+const char *ssid = "HASIBS TRACKER";
+const char *password = "awse2313";
+/*------------------------------------------------------------------------*/
+float Satellite_Count, latitude , longitude , Speed_MPH , Altitude_Feet ;
+int year , month , date, hour , minute , second;
+String date_str , time_str , lat_str , lng_str  , sLat_str , Sspeed_str , alt_str;
+int pm;
+/*------------------------------------------------------------------------*/
+ESP8266WebServer server(80);
+
+/*------------------------------------------------------------------------*/
+void handleRoot() {
+  String s = "<!DOCTYPE html> <html> <head> <title>----HASIBS TRACKER-----</title> <style>";
+  s += "a:link {background-color: ;text-decoration: none;}";
+  s += "table, th, td {border: 2px solid black;} </style> </head> <body> <h1  style=";
+  s += "font-size:300%;";
+  s += " ALIGN=CENTER>----HASIBS TRACKER-----</h1>";
+  s += "<p ALIGN=CENTER style=""font-size:150%;""";
+  s += "> <b>LOCATION DETAILS &LOCKED SATELITE</b></p> <table ALIGN=CENTER style=";
+  s += "width:40%";
+ 
+  s += "> <tr> <th><h2>LATITUDE</h2></th>";
+  s += "<td ALIGN=CENTER >";
+  s += lat_str;
+  s += " </td> </tr> <tr> <th><h2>LOGNITUDE</h2></th> <td ALIGN=CENTER ><h2>";
+  s += lng_str;
+   s += "</td> </tr> <tr> <th><h2>SATELITE NUMBER</h2></th> <td ALIGN=CENTER ><h2>";
+  s += sLat_str;
+  s += "</h2></td> </tr> <tr> <th><h2>SAT_SPPED</h2></th> <td ALIGN=CENTER ><h2>";
+  s += Sspeed_str;
+  s += "</h2></td> </tr> <tr>  <th><h2>DATE</h2></th> <td ALIGN=CENTER ><h2>";
+  s += date_str;
+  s += "</h2></td></tr> <tr> <th><h2>TIME-BD </h2></th> <td ALIGN=CENTER ><h2>";
+  s += time_str;
+  s += "</h2></td>  </tr> </table> ";
+
+  if (gps.location.isValid())
+  {
+    s += "<p align=center><a style=""color:RED;font-size:125%;"" href=""http://maps.google.com/maps?&z=15&mrt=yp&t=k&q=";
+    s += lat_str;
+    s += "+";
+    s += lng_str;
+    s += """ target=""_top"">Click here!</a> To check the location in Google maps.</p>";
+  }
+
+
+  server.send(200, "text/html", s);
+
+
+
+
+
+
+
+}
+/*------------------------------------------------------------------------*/
+void setup() {
+  delay(1000);
+  Serial.begin(115200);
+  ss.begin(9600);
+  Serial.println();
+  Serial.print("Configuring access point...");
+  /* You can remove the password parameter if you want the AP to be open. */
+  WiFi.softAP(ssid, password);
+
+  IPAddress myIP = WiFi.softAPIP();
+  Serial.print("AP IP address: ");
+  Serial.println(myIP);
+  server.on("/", handleRoot);
+  server.begin();
+  Serial.println("HTTP server started");
+}
+
+void loop() {
+  server.handleClient();
+
+
+  while (ss.available() > 0)
+    if (gps.encode(ss.read()))
+    {
+      if (gps.location.isValid())
+      {
+
+
+        Satellite_Count = gps.satellites.value();
+        sLat_str = String(Satellite_Count);
+        latitude = gps.location.lat();
+        lat_str = String(latitude , 6);
+        longitude = gps.location.lng();
+        lng_str = String(longitude , 6);
+        Speed_MPH = gps.speed.mph ();
+        Sspeed_str = String(Speed_MPH);
+        Altitude_Feet = gps.altitude.feet();
+        alt_str = String(Altitude_Feet);
+
+      }
+
+      if (gps.date.isValid())
+      {
+        date_str = "";
+        date = gps.date.day();
+        month = gps.date.month();
+        year = gps.date.year();
+
+        if (date < 10)
+          date_str = '0';
+        date_str += String(date);
+
+        date_str += " / ";
+
+        if (month < 10)
+          date_str += '0';
+        date_str += String(month);
+
+        date_str += " / ";
+
+        if (year < 10)
+          date_str += '0';
+        date_str += String(year);
+      }
+
+      if (gps.time.isValid())
+      {
+        time_str = "";
+        hour = gps.time.hour();
+        minute = gps.time.minute();
+        second = gps.time.second();
+
+        minute = (minute + 60);
+        if (minute > 59)
+        {
+          minute = minute - 60;
+          hour = hour + 1;
+        }
+        hour = (hour + 5) ;
+        if (hour > 23)
+          hour = hour - 24;
+
+        if (hour >= 12)
+          pm = 1;
+        else
+          pm = 0;
+
+        hour = hour % 12;
+
+        if (hour < 10)
+          time_str = '0';
+        time_str += String(hour);
+
+        time_str += " : ";
+
+        if (minute < 10)
+          time_str += '0';
+        time_str += String(minute);
+
+        time_str += " : ";
+
+        if (second < 10)
+          time_str += '0';
+        time_str += String(second);
+
+        if (pm == 1)
+          time_str += " PM ";
+        else
+          time_str += " AM ";
+
+      }
+
+    }
+  // Check if a client has connected
+  /*WiFiClient client = server.available();
+    if (!client)
+    {
+    return;
+    }
+
+    // Prepare the response
+    String s = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n <!DOCTYPE html> <html> <head> <title>GPS Interfacing with NodeMCU</title> <style>";
+    s += "a:link {background-color: YELLOW;text-decoration: none;}";
+    s += "table, th, td {border: 1px solid black;} </style> </head> <body> <h1  style=";
+    s += "font-size:300%;";
+    s += " ALIGN=CENTER> GPS Interfacing with NodeMCU</h1>";
+    s += "<p ALIGN=CENTER style=""font-size:150%;""";
+    s += "> <b>Location Details</b></p> <table ALIGN=CENTER style=";
+    s += "width:50%";
+    s += "> <tr> <th>Latitude</th>";
+    s += "<td ALIGN=CENTER >";
+    s += lat_str;
+    s += "</td> </tr> <tr> <th>Longitude</th> <td ALIGN=CENTER >";
+    s += lng_str;
+    s += "</td> </tr> <tr>  <th>Date</th> <td ALIGN=CENTER >";
+    s += date_str;
+    s += "</td></tr> <tr> <th>Time</th> <td ALIGN=CENTER >";
+    s += time_str;
+    s += "</td>  </tr> </table> ";
+
+
+    if (gps.location.isValid())
+    {
+     s += "<p align=center><a style=""color:RED;font-size:125%;"" href=""http://maps.google.com/maps?&z=15&mrt=yp&t=k&q=";
+    s += lat_str;
+    s += "+";
+    s += lng_str;
+    s += """ target=""_top"">Click here!</a> To check the location in Google maps.</p>";
+    }
+
+    s += "</body> </html> \n"; */
+
+  /* client.print(s);
+    delay(100);
+  */
+}
